@@ -69,11 +69,19 @@
         async function updatePrices() {
             try {
                 const response = await fetch('/api/prices'); 
+                
+                // CHECK: Did the server report an error?
+                if (!response.ok) {
+                    throw new Error("Server Error");
+                }
+
                 const data = await response.json();
 
-                // Helper function to safely update text
+                // Helper to update text safely
                 const setPrice = (id, val) => {
-                    document.getElementById(`price-${id}`).innerText = "$" + val;
+                    const el = document.getElementById(`price-${id}`);
+                    el.innerText = "$" + val;
+                    el.style.color = "#eaecef"; 
                 };
 
                 setPrice('bitcoin', data.bitcoin.usd);
@@ -83,12 +91,27 @@
                 setPrice('cardano', data.cardano.usd);
                 setPrice('dogecoin', data.dogecoin.usd);
 
+                // Flash the status dot green to show we are live
+                document.querySelector('.status-dot').style.backgroundColor = "#0ecb81";
+
             } catch (error) {
-                console.error("Error fetching data:", error);
+                console.error("Fetch failed:", error);
+                
+                // VISUAL ERROR HANDLING: Turn everything Red/Offline
+                document.querySelector('.status-dot').style.backgroundColor = "#f6465d"; // Red Dot
+                
+                // Set all prices to "OFFLINE"
+                const ids = ['bitcoin', 'ethereum', 'ripple', 'solana', 'cardano', 'dogecoin'];
+                ids.forEach(id => {
+                    const el = document.getElementById(`price-${id}`);
+                    el.innerText = "OFFLINE";
+                    el.style.color = "#f6465d"; // Red text
+                });
             }
         }
 
-        setInterval(updatePrices, 3000);
+        // Refresh every 5 seconds (increased from 3s to avoid hitting API limits)
+        setInterval(updatePrices, 15000);
         updatePrices();
     </script>
 </body>

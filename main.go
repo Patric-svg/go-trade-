@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 )
 
-// SCALABILITY UPGRADE: Added slots for 4 new assets
 type CryptoResponse struct {
 	Bitcoin  PriceData `json:"bitcoin"`
 	Ethereum PriceData `json:"ethereum"`
@@ -22,19 +22,39 @@ type PriceData struct {
 }
 
 func pricesHandler(w http.ResponseWriter, r *http.Request) {
-	// SCALABILITY UPGRADE: Added more IDs to the URL query
+	// Set a timeout so the server doesn't hang forever if the API is slow
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+
 	url := "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,ripple,solana,cardano,dogecoin&vs_currencies=usd"
 	
-	resp, err := http.Get(url)
+	resp, err := client.Get(url)
+	
+	// ERROR 1: Network Failure (e.g., No Internet)
 	if err != nil {
-		http.Error(w, "Failed to fetch prices", http.StatusInternalServerError)
+		fmt.Println("Error fetching from API:", err)
+		http.Error(w, `{"error": "Network Error"}`, http.StatusServiceUnavailable)
 		return
 	}
 	defer resp.Body.Close()
 
+	// ERROR  2: Bad Status Code (e.g., API Limit Reached)
+	if resp.StatusCode != 200 {
+		fmt.Println("API returned bad status:", resp.Status)
+		http.Error(w, `{"error": "API Error"}`, http.StatusBadGateway)
+		return
+	}
+
 	body, _ := ioutil.ReadAll(resp.Body)
 	var prices CryptoResponse
-	json.Unmarshal(body, &prices)
+	
+	// ERROR 3: Bad JSON (e.g., API changed format)
+	err = json.Unmarshal(body, &prices)
+	if err != nil {
+		http.Error(w, `{"error": "Data Parse Error"}`, http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(prices)
@@ -45,6 +65,6 @@ func main() {
 	http.Handle("/", fs)
 	http.HandleFunc("/api/prices", pricesHandler)
 
-	fmt.Println("🚀 GoTrade Dashboard running at http://localhost:8080")
+	fmt.Println("🚀 GoTrade Sentinel running at http://localhost:8080")
 	http.ListenAndServe(":8080", nil)
 }

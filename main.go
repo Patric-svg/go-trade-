@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -66,5 +67,9 @@ func main() {
 	http.HandleFunc("/api/prices", pricesHandler)
 
 	fmt.Println("🚀 GoTrade Sentinel running at http://localhost:8080")
-	http.ListenAndServe(":8080", nil)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // Default to 8080 if running locally
+	}
+	http.ListenAndServe(":"+port, nil)
 }
